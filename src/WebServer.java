@@ -77,71 +77,77 @@ public final class WebServer {
         } finally {
             try {
                 if (br != null) br.close();
-            } catch (IOException e) {}
+            } catch (IOException e) { e.printStackTrace(); }
             try {
                 if (fr != null) fr.close();
-            } catch (IOException e) {}
+            } catch (IOException e) { e.printStackTrace(); }
         }
     }
 }
 
-final class HttpRequest implements Runnable
-{
-    final static String CRLF = "\r\n";
+final class HttpRequest implements Runnable {
+
+    private final static String CRLF = "\r\n";
     private Socket socket;
     private List<String[]> headerLineList = new LinkedList<>();
     private String statusLine = null;
     private String contentTypeLine = null;
     private String entityBody = null;
+    private DataOutputStream os;
+    private InputStreamReader isr;
+    private BufferedReader br;
+    private boolean fileRequested = false;
+    private boolean fileExists = false;
+    private String userAgent = "unknown";
 
     // Constructor
     public HttpRequest(Socket socket) throws Exception {
         this.socket = socket;
+        // Get a reference to the socket's input and output streams.
+        InputStream is = socket.getInputStream();
+        os = new DataOutputStream(socket.getOutputStream());
+        // Set up input stream filters.
+        isr = new InputStreamReader(is);
+        br = new BufferedReader(isr);
     }
 
     // Implement the run() method of the Runnable interface.
     public void run() {
-        try {
-            processHttpRequest();
-        } catch (Exception e) {}
+        try { processHttpRequest(); } catch (Exception e) { e.printStackTrace(); }
     }
 
     private void processHttpRequest() throws Exception {
-        // Get a reference to the socket's input and output streams.
-        InputStream is = socket.getInputStream();
-        DataOutputStream os = new DataOutputStream(socket.getOutputStream());
-        // Set up input stream filters.
-        InputStreamReader isr = new InputStreamReader(is);
-        BufferedReader br = new BufferedReader(isr);
 
         // Get and display the header lines.
         String headerLine = null;
-        //System.out.println("Header Line: ");
         while ((headerLine = br.readLine()).length() != 0) {
             System.out.println(headerLine);
+            if (headerLine.startsWith("User-Agent: ")) userAgent = headerLine.replaceFirst("User-Agent: ","");
             headerLineList.add(headerLine.split("\\s"));
         }
-        boolean fileExists = false;
+        System.out.println("------------------");
 
-        if (headerLineList.get(0).length != 3)
+        if (headerLineList.get(0).length < 2 || headerLineList.get(0).length > 3)
             badRequest();
-        else if (!(headerLineList.get(0)[2].startsWith("HTTP/")))
+        else if (headerLineList.get(0).length == 3 && !(headerLineList.get(0)[2].startsWith("HTTP/")))
             badRequest();
         else if (!(headerLineList.get(0)[1].startsWith("/")))
             badRequest();
         else {
+            boolean obeyFileRequest = true;
             switch (headerLineList.get(0)[0]) {
                 case "GET":
                     System.out.println("Method used: GET");
-                    get();
+                    fileRequested = true;
                     break;
                 case "HEAD":
                     System.out.println("Method used: HEAD");
-                    notImplemented();
+                    fileRequested = true;
+                    obeyFileRequest = false;
                     break;
                 case "PUT":
                     System.out.println("Method used: PUT");
-                    notImplemented();
+                    notAllowed();
                     break;
                 case "POST":
                     System.out.println("Method used: POST");
@@ -155,44 +161,45 @@ final class HttpRequest implements Runnable
                     System.out.println("Method used: NULL");
                     badRequest();
             }
+            if (fileRequested) {
+            // Prepend a "." so that file request is within the current directory.
+            // fileName = "." + fileName; ToDo
+                String fileName = new File(headerLineList.get(0)[1].replaceFirst("/", "")).getAbsolutePath();
+                // Open the requested file.
+                FileInputStream fis = null;
+                try {
+                    fis = new FileInputStream(fileName);
+                    fileExists = true;
+                    ok(fileName);
+                    if (obeyFileRequest) sendBytes(fis, os);
+                    try { fis.close(); } catch (IOException e) { e.printStackTrace(); }
+                } catch (FileNotFoundException e) {
+                    notFound();
+                }
+            }
         }
-
-        // Prepend a "." so that file request is within the current directory.
-        // fileName = "." + fileName; ToDo
-        String fileName = headerLineList.get(0)[1];
-        fileName = "C:\\Dropbox\\Entwicklung\\WebServer\\out\\production\\WebServer\\" + fileName;
-        // System.out.println(fileName);
-        // Open the requested file.
-        FileInputStream fis = null;
-        try {
-            fis = new FileInputStream(fileName);
-            fileExists = true;
-        } catch (FileNotFoundException e) {}
-
-        // Construct the response message.
-        if (fileExists) ok(fileName);
-        else notFound();
-
-        // Send the status line.
-        os.writeBytes(statusLine);
-        System.out.print("------------------\n"+statusLine);
-        // Send the content type line.
-        os.writeBytes(contentTypeLine);
-        System.out.print(contentTypeLine+"------------------\n\n");
-        // Send a blank line to indicate the end of the header lines.
-        os.writeBytes(CRLF);
-        // Send the entity body.
-        if (fileExists)	{
-            sendBytes(fis, os); // ToDo evtl. Exceptions catchen
-            fis.close();
-        }
-        else os.writeBytes(entityBody);
 
         // Close streams and socket.
-//        is.close();
-        try { os.close(); } catch (IOException e) { }
-        try { br.close(); } catch (IOException e) { }
-        try { socket.close(); } catch (IOException e) { }
+        try { os.close(); } catch (IOException e) { e.printStackTrace(); }
+        try { br.close(); } catch (IOException e) { e.printStackTrace(); }
+        try { isr.close(); } catch (IOException e) { e.printStackTrace(); }
+        try { socket.close(); } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    private void sendResponse() {
+        try {
+            // Send the status line.
+            os.writeBytes(statusLine);
+            System.out.print(statusLine);
+            // Send the content type line.
+            os.writeBytes(contentTypeLine);
+            System.out.print(contentTypeLine+"\n\n");
+            // Send a blank line to indicate the end of the header lines.
+            os.writeBytes(CRLF);
+            if (!fileExists) os.writeBytes(entityBody);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void sendBytes(FileInputStream fis, OutputStream os)
@@ -213,40 +220,49 @@ final class HttpRequest implements Runnable
         return "application/octet-stream";
     }
 
-    private void get() {
-    }
-
     // 200 OK
     private void ok(String fileName) {
         responseTemplate("200", "OK", contentType(fileName));
+        sendResponse();
     }
 
     // 400 Bad Request
     private void badRequest() {
         responseTemplate("400", "Bad Request", "text/html");
+        sendResponse();
     }
 
     // 404 Not Found
     private void notFound() {
         responseTemplate("404", "Not Found", "text/html");
+        sendResponse();
     }
 
     // 405 Method Not Allowed
     private void notAllowed() {
         responseTemplate("405", "Method Not Allowed", "text/html");
+        sendResponse();
     }
 
     // 501 Not Implemented
     private void notImplemented() {
         responseTemplate("501", "Not Implemented", "text/html");
+        sendResponse();
     }
 
     private void responseTemplate(String code, String message, String mime) {
         statusLine = "HTTP/1.0 " + code + " " + message + CRLF;
         contentTypeLine = "Content-type: " + mime + CRLF;
-        entityBody = "<HTML>" +
-                "<HEAD><TITLE>" + message + "</TITLE></HEAD>" +
-                "<BODY>" + message + "</BODY></HTML>";
+        entityBody = "<HTML>\n" +
+                "<HEAD>\n" +
+                "<TITLE>" + message + "</TITLE>\n" +
+                "</HEAD>\n" +
+                "<BODY>\n" +
+                "<h3>" + message + "</h3>" +
+                "<p>Client-IP: " + socket.getInetAddress().getHostAddress() + "</p>" +
+                "<hp>User-Agent: " + userAgent + "</p>" +
+                "</BODY>" +
+                "</HTML>";
     }
 
 }
