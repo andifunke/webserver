@@ -5,7 +5,7 @@ import java.util.* ;
 public final class WebServer {
 
     public static HashMap<String, String> mimeTable = new HashMap<>();
-    private static String mimePath = "C:\\Dropbox\\Entwicklung\\WebServer\\out\\production\\WebServer\\mime.types";
+    private static String mimePath = new File("mime.types").getAbsolutePath();
 
     public static void main(String argv[]) throws Exception {
         if (argv.length == 2 && argv[0].equals("-mime"))
@@ -119,7 +119,7 @@ final class HttpRequest implements Runnable
         //System.out.println("Header Line: ");
         while ((headerLine = br.readLine()).length() != 0) {
             System.out.println(headerLine);
-            headerLineList.add(headerLine.split(" "));
+            headerLineList.add(headerLine.split("\\s"));
         }
         boolean fileExists = false;
 
