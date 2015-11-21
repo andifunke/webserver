@@ -120,9 +120,11 @@ final class HttpRequest implements Runnable {
 
         // Get and display the header lines.
         String headerLine = null;
+        System.out.println("------------------");
+        System.out.println("Request:");
         while ((headerLine = br.readLine()).length() != 0) {
             System.out.println(headerLine);
-            if (headerLine.startsWith("User-Agent: ")) userAgent = headerLine.replaceFirst("User-Agent: ","");
+            if (headerLine.toLowerCase().startsWith("user-agent: ")) userAgent = headerLine.replaceFirst("User-Agent: ","");
             headerLineList.add(headerLine.split("\\s"));
         }
         System.out.println("------------------");
@@ -145,17 +147,9 @@ final class HttpRequest implements Runnable {
                     fileRequested = true;
                     obeyFileRequest = false;
                     break;
-                case "PUT":
-                    System.out.println("Method used: PUT");
-                    notAllowed();
-                    break;
                 case "POST":
                     System.out.println("Method used: POST");
                     notImplemented();
-                    break;
-                case "DELETE":
-                    System.out.println("Method used: DELETE");
-                    notAllowed();
                     break;
                 default:
                     System.out.println("Method used: NULL");
@@ -188,12 +182,13 @@ final class HttpRequest implements Runnable {
 
     private void sendResponse() {
         try {
+            System.out.println("Response:");
             // Send the status line.
             os.writeBytes(statusLine);
             System.out.print(statusLine);
             // Send the content type line.
             os.writeBytes(contentTypeLine);
-            System.out.print(contentTypeLine+"\n\n");
+            System.out.print(contentTypeLine+"\n");
             // Send a blank line to indicate the end of the header lines.
             os.writeBytes(CRLF);
             if (!fileExists) os.writeBytes(entityBody);
@@ -223,31 +218,21 @@ final class HttpRequest implements Runnable {
     // 200 OK
     private void ok(String fileName) {
         responseTemplate("200", "OK", contentType(fileName));
-        sendResponse();
     }
 
     // 400 Bad Request
     private void badRequest() {
         responseTemplate("400", "Bad Request", "text/html");
-        sendResponse();
     }
 
     // 404 Not Found
     private void notFound() {
         responseTemplate("404", "Not Found", "text/html");
-        sendResponse();
-    }
-
-    // 405 Method Not Allowed
-    private void notAllowed() {
-        responseTemplate("405", "Method Not Allowed", "text/html");
-        sendResponse();
     }
 
     // 501 Not Implemented
     private void notImplemented() {
         responseTemplate("501", "Not Implemented", "text/html");
-        sendResponse();
     }
 
     private void responseTemplate(String code, String message, String mime) {
@@ -263,6 +248,18 @@ final class HttpRequest implements Runnable {
                 "<hp>User-Agent: " + userAgent + "</p>" +
                 "</BODY>" +
                 "</HTML>";
+        sendResponse();
     }
 
 }
+
+// TODO:
+// Testen unter Linux
+// Testen mit verschiedenen Browsern und Telnet
+// Kommentare einfügen
+// Auskommentierten Code entfernen
+// Request Headerlines mit mehreren Whitespace-Zeichen testen
+// URL Decoding
+// POST implementieren (s.u.a. 7.2.2 - content-length), Response 201, content-length s. 10.4
+// Conditional GET s. 8.1 und 10.9
+// index.html/htm als Standard setzen
