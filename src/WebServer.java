@@ -97,7 +97,7 @@ final class HttpRequest implements Runnable {
 
     private final static String CRLF = "\r\n";
     private Socket socket;
-    private List<String[]> headerLineList = new LinkedList<>();
+    private LinkedList<String[]> headerLineList = new LinkedList<>();
     private String statusLine = null;
     private String contentTypeLine = null;
     private String entityBody = null;
@@ -151,7 +151,7 @@ final class HttpRequest implements Runnable {
                     userAgent = headerLine.replaceFirst("User-Agent: ", "");
                 // Create tokens from header-line
                 headerLineList.add(headerLine.split("\\s"));
-                System.out.println(headerLine.length());
+                System.out.println(headerLineList.getLast().length);
             }
         } catch (SocketException e) {
             System.out.println("Connection closed by client.\n");
@@ -304,7 +304,7 @@ final class HttpRequest implements Runnable {
                 "<p>Client-IP: " + socket.getInetAddress().getHostAddress() + "</p>\n" +
                 "<hp>User-Agent: " + userAgent + "</p>\n" +
                 "</BODY>\n" +
-                "</HTML>";
+                "</HTML>\n";
         sendResponse();
     }
 }
