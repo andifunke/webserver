@@ -8,13 +8,18 @@ public final class WebServer {
     private static String mimePath = new File("mime.types").getAbsolutePath();
 
     public static void main(String argv[]) throws Exception {
+
+        // Check for correct parameters
         if (argv.length == 2 && argv[0].equals("-mime"))
+            // Set path to mime-table definition file
             mimePath = argv[1];
         else if (argv.length != 0) {
             System.out.println("Kein gültiger Parameter\n");
             System.exit(0);
         }
+        // Parse mime-table list
         createMimeTable();
+
         // Set the port number.
         int port = 6789;
         // Establish the listen socket.
@@ -22,6 +27,7 @@ public final class WebServer {
         try {
             serverSocket = new ServerSocket(port);
         } catch (IOException e) {
+            // Check if port is already in use
             System.out.println("Port " + port + " derzeit nicht verfügbar.");
             System.exit(0);
         }
@@ -29,7 +35,6 @@ public final class WebServer {
 
         // Process HTTP service requests in an infinite loop.
         while (true) {
-            //System.out.println("test"+ (++i));
             Socket client;
             try {
                 // Listen for a TCP connection request.
@@ -42,14 +47,17 @@ public final class WebServer {
                     // Start the thread.
                     thread.start();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("Server error: could not process HTTP request.");
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("Could not connect to client-socket.");
             }
         }
     }
 
+    /**
+     * read mime-table file into hash-map.
+      */
     private static void createMimeTable() {
         String line;
         FileReader fr = null;
@@ -69,7 +77,6 @@ public final class WebServer {
                         }
                     }
                 }
-                //System.out.println(mimeTable);
             }
         } catch (IOException e) {
             System.out.println("Mime-Table nicht gefunden.\n");
@@ -77,13 +84,14 @@ public final class WebServer {
         } finally {
             try {
                 if (br != null) br.close();
-            } catch (IOException e) { e.printStackTrace(); }
+            } catch (IOException e) { e.getMessage(); }
             try {
                 if (fr != null) fr.close();
-            } catch (IOException e) { e.printStackTrace(); }
+            } catch (IOException e) { e.getMessage(); }
         }
     }
 }
+
 
 final class HttpRequest implements Runnable {
 
@@ -100,7 +108,11 @@ final class HttpRequest implements Runnable {
     private boolean fileExists = false;
     private String userAgent = "unknown";
 
-    // Constructor
+    /**
+     * Constructor
+     * @param socket        method expects client's socket
+     * @throws Exception
+     */
     public HttpRequest(Socket socket) throws Exception {
         this.socket = socket;
         // Get a reference to the socket's input and output streams.
@@ -111,30 +123,48 @@ final class HttpRequest implements Runnable {
         br = new BufferedReader(isr);
     }
 
-    // Implement the run() method of the Runnable interface.
+    /**
+     * Implement the run() method of the Runnable interface.
+     */
     public void run() {
         try { processHttpRequest(); } catch (Exception e) { e.printStackTrace(); }
     }
 
+    /**
+     * process HTTP/1.0 request and close connection afterwards
+     * @throws Exception
+     */
     private void processHttpRequest() throws Exception {
 
+        System.out.println("New connection established by client.");
         // Get and display the header lines.
-        String headerLine = null;
+        String headerLine;
         System.out.println("------------------");
         System.out.println("Request:");
-        while ((headerLine = br.readLine()).length() != 0) {
-            System.out.println(headerLine);
-            if (headerLine.toLowerCase().startsWith("user-agent: ")) userAgent = headerLine.replaceFirst("User-Agent: ","");
-            headerLineList.add(headerLine.split("\\s"));
-        }
+        // Read all header-lines into a list of string-arrays (one node per line).
+        try {
+            while (socket != null && (headerLine = br.readLine()).length() != 0) {
+                // Write line to output.
+                System.out.println(headerLine);
+                // remember the client's user-agent
+                if (headerLine.toLowerCase().startsWith("user-agent: "))
+                    userAgent = headerLine.replaceFirst("User-Agent: ", "");
+                // Create tokens from header-line
+                headerLineList.add(headerLine.split("\\s"));
+            }
+        } catch (SocketException e) {
+            System.out.println("Connection closed by client.\n");
+        } catch (NullPointerException e) { }
         System.out.println("------------------");
 
-        if (headerLineList.get(0).length < 2 || headerLineList.get(0).length > 3)
+        // Check for correct request-line parameters
+        if (headerLineList.size() == 0 || headerLineList.get(0).length < 2 || headerLineList.get(0).length > 3)
             badRequest();
         else if (headerLineList.get(0).length == 3 && !(headerLineList.get(0)[2].startsWith("HTTP/")))
             badRequest();
         else if (!(headerLineList.get(0)[1].startsWith("/")))
             badRequest();
+        // Understand request-method and address accordingly
         else {
             boolean obeyFileRequest = true;
             switch (headerLineList.get(0)[0]) {
@@ -153,14 +183,14 @@ final class HttpRequest implements Runnable {
                     break;
                 default:
                     System.out.println("Method used: NULL");
-                    badRequest();
+                    notImplemented();
             }
             if (fileRequested) {
-            // Prepend a "." so that file request is within the current directory.
-            // fileName = "." + fileName; ToDo
+                // format abs_path to work with Windows and Linux OS.
                 String fileName = new File(headerLineList.get(0)[1].replaceFirst("/", "")).getAbsolutePath();
                 // Open the requested file.
                 FileInputStream fis = null;
+                // Check if resource is available and if so send as entity-body
                 try {
                     fis = new FileInputStream(fileName);
                     fileExists = true;
@@ -178,22 +208,28 @@ final class HttpRequest implements Runnable {
         try { br.close(); } catch (IOException e) { e.printStackTrace(); }
         try { isr.close(); } catch (IOException e) { e.printStackTrace(); }
         try { socket.close(); } catch (IOException e) { e.printStackTrace(); }
+        System.out.println("Connection closed by server.\n");
     }
 
     private void sendResponse() {
         try {
-            System.out.println("Response:");
-            // Send the status line.
-            os.writeBytes(statusLine);
-            System.out.print(statusLine);
-            // Send the content type line.
-            os.writeBytes(contentTypeLine);
-            System.out.print(contentTypeLine+"\n");
-            // Send a blank line to indicate the end of the header lines.
-            os.writeBytes(CRLF);
-            if (!fileExists) os.writeBytes(entityBody);
+            if (socket != null) {
+                System.out.println("Response:");
+                // Send the status line.
+                os.writeBytes(statusLine);
+                System.out.print(statusLine);
+                // Send the content type line.
+                os.writeBytes(contentTypeLine);
+                System.out.print(contentTypeLine);
+                System.out.println("------------------");
+                // Send a blank line to indicate the end of the header lines.
+                os.writeBytes(CRLF);
+                // Send predefined entity-body if no ressource is to be send
+                if (!fileExists) os.writeBytes(entityBody);
+            }
+            else System.out.println("Connection closed by client.\n");
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Server error: could not send response.");
         }
     }
 
@@ -207,6 +243,11 @@ final class HttpRequest implements Runnable {
             os.write(buffer, 0, bytes);
     }
 
+    /**
+     * read mime-type from hash-map based upon file-ending as key
+     * @param fileName  method expects full file name (full path not needed)
+     * @return          returns mime-type as string
+     */
     private static String contentType(String fileName) {
         String mimeType;
         String fileExtension = fileName.substring(fileName.lastIndexOf(".")+1);
@@ -235,6 +276,12 @@ final class HttpRequest implements Runnable {
         responseTemplate("501", "Not Implemented", "text/html");
     }
 
+    /**
+     * write predefined response-header and entity body
+     * @param code      status code number
+     * @param message   status code message
+     * @param mime      response header content-type
+     */
     private void responseTemplate(String code, String message, String mime) {
         statusLine = "HTTP/1.0 " + code + " " + message + CRLF;
         contentTypeLine = "Content-type: " + mime + CRLF;
@@ -243,10 +290,10 @@ final class HttpRequest implements Runnable {
                 "<TITLE>" + message + "</TITLE>\n" +
                 "</HEAD>\n" +
                 "<BODY>\n" +
-                "<h3>" + message + "</h3>" +
-                "<p>Client-IP: " + socket.getInetAddress().getHostAddress() + "</p>" +
-                "<hp>User-Agent: " + userAgent + "</p>" +
-                "</BODY>" +
+                "<h3>" + message + "</h3>\n" +
+                "<p>Client-IP: " + socket.getInetAddress().getHostAddress() + "</p>\n" +
+                "<hp>User-Agent: " + userAgent + "</p>\n" +
+                "</BODY>\n" +
                 "</HTML>";
         sendResponse();
     }
@@ -256,10 +303,7 @@ final class HttpRequest implements Runnable {
 // TODO:
 // Testen unter Linux
 // Testen mit verschiedenen Browsern und Telnet
-// Kommentare einfügen
-// Auskommentierten Code entfernen
 // Request Headerlines mit mehreren Whitespace-Zeichen testen
 // URL Decoding
 // POST implementieren (s.u.a. 7.2.2 - content-length), Response 201, content-length s. 10.4
 // Conditional GET s. 8.1 und 10.9
-// index.html/htm als Standard setzen
