@@ -150,7 +150,7 @@ final class HttpRequest implements Runnable {
                 if (headerLine.toLowerCase().startsWith("user-agent: "))
                     userAgent = headerLine.replaceFirst("User-Agent: ", "");
                 // Create tokens from header-line
-                headerLineList.add(headerLine.split("\\s"));
+                headerLineList.add(headerLine.split("\\s+"));
                 System.out.println(headerLineList.getLast().length);
             }
         } catch (SocketException e) {
