@@ -148,7 +148,7 @@ final class HttpRequest implements Runnable {
         // Get and display the header lines.
         String headerLine;
         System.out.println("------------------");
-        System.out.println("Request:");
+        System.out.println("REQUEST HEADER:");
         // Read all header-lines into a list of string-arrays (one node per line).
         try {
             while (socket != null && (headerLine = br.readLine()).length() != 0) {
@@ -159,7 +159,6 @@ final class HttpRequest implements Runnable {
                     userAgent = headerLine.replaceFirst("User-Agent: ", "");
                 // Create tokens from header-line
                 headerLineList.add(headerLine.split("\\s+"));
-                System.out.println(headerLineList.getLast().length);
             }
         } catch (SocketException e) {
             System.out.println(closedByClient);
@@ -226,7 +225,7 @@ final class HttpRequest implements Runnable {
     private void sendResponse() {
         try {
             if (socket != null) {
-                System.out.println("Response:");
+                System.out.println("RESPONSE HEADER:");
                 // Send the status line.
                 os.writeBytes(statusLine);
                 System.out.print(statusLine);
