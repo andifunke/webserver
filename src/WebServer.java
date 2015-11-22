@@ -204,11 +204,16 @@ final class HttpRequest implements Runnable {
         }
 
         // Close streams and socket.
-        try { os.close(); } catch (IOException e) { e.printStackTrace(); }
-        try { br.close(); } catch (IOException e) { e.printStackTrace(); }
-        try { isr.close(); } catch (IOException e) { e.printStackTrace(); }
-        try { socket.close(); } catch (IOException e) { e.printStackTrace(); }
-        System.out.println("Connection closed by server.\n");
+        try { os.close(); } catch (IOException e) { }
+        try { br.close(); } catch (IOException e) { }
+        try { isr.close(); } catch (IOException e) { }
+        try {
+            if (socket != null) {
+                socket.close();
+                System.out.println("Connection closed by server.\n");
+            }
+            else System.out.println("Connection closed by client.\n");
+        } catch (IOException e) { System.out.println("Connection closed by client.\n"); }
     }
 
     private void sendResponse() {
@@ -297,7 +302,6 @@ final class HttpRequest implements Runnable {
                 "</HTML>";
         sendResponse();
     }
-
 }
 
 // TODO:
