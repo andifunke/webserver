@@ -195,8 +195,8 @@ final class HttpRequest implements Runnable {
                     fis = new FileInputStream(fileName);
                     fileExists = true;
                     ok(fileName);
-                    if (obeyFileRequest) sendBytes(fis, os);
-                    try { fis.close(); } catch (IOException e) { e.printStackTrace(); }
+                    try { if (obeyFileRequest) sendBytes(fis, os); } catch (IOException e) { }
+                    try { fis.close(); } catch (IOException e) { }
                 } catch (FileNotFoundException e) {
                     notFound();
                 }
