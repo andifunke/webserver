@@ -240,7 +240,7 @@ final class HttpRequest implements Runnable {
             }
             else System.out.println(closedByClient);
         } catch (IOException e) {
-            System.out.println("Server error: could not send response.");
+            System.out.println("Could not send response.");
         }
     }
 
