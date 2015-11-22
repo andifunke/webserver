@@ -14,7 +14,7 @@ public final class WebServer {
             // Set path to mime-table definition file
             mimePath = argv[1];
         else if (argv.length != 0) {
-            System.out.println("Kein gültiger Parameter\n");
+            System.out.println("No valid parameter\n");
             System.exit(0);
         }
         // Parse mime-table list
@@ -28,11 +28,12 @@ public final class WebServer {
             serverSocket = new ServerSocket(port);
         } catch (IOException e) {
             // Check if port is already in use
-            System.out.println("Port " + port + " derzeit nicht verfügbar.");
+            System.out.println("Port " + port + " currently not available.");
             System.exit(0);
         }
         System.out.println("WebServer running...\n");
 
+        int connectionCounter = 0;
         // Process HTTP service requests in an infinite loop.
         while (true) {
             Socket client;
@@ -41,7 +42,7 @@ public final class WebServer {
                 client = serverSocket.accept();
                 try {
                     // Construct an object to process the HTTP request message.
-                    HttpRequest request = new HttpRequest(client);
+                    HttpRequest request = new HttpRequest(client, ++connectionCounter);
                     // Create a new thread to process the request.
                     Thread thread = new Thread(request);
                     // Start the thread.
@@ -107,13 +108,20 @@ final class HttpRequest implements Runnable {
     private boolean fileRequested = false;
     private boolean fileExists = false;
     private String userAgent = "unknown";
+    private int connectionNumber;
+    private String closedByClient;
+    private String closedByServer;
 
     /**
      * Constructor
-     * @param socket        method expects client's socket
+     * @param socket            method expects client's socket
+     * @param connectionNumber  identifies the connection with a unique ID
      * @throws Exception
      */
-    public HttpRequest(Socket socket) throws Exception {
+    public HttpRequest(Socket socket, int connectionNumber) throws Exception {
+        this.connectionNumber = connectionNumber;
+        closedByClient = "Connection " + connectionNumber + " closed by client.\n";
+        closedByServer = "Connection " + connectionNumber + " closed by server.\n";
         this.socket = socket;
         // Get a reference to the socket's input and output streams.
         InputStream is = socket.getInputStream();
@@ -136,7 +144,7 @@ final class HttpRequest implements Runnable {
      */
     private void processHttpRequest() throws Exception {
 
-        System.out.println("New connection established by client.");
+        System.out.println("Connection " + connectionNumber + " established by client.");
         // Get and display the header lines.
         String headerLine;
         System.out.println("------------------");
@@ -154,7 +162,7 @@ final class HttpRequest implements Runnable {
                 System.out.println(headerLineList.getLast().length);
             }
         } catch (SocketException e) {
-            System.out.println("Connection closed by client.\n");
+            System.out.println(closedByClient);
         } catch (NullPointerException e) { }
         System.out.println("------------------");
 
@@ -170,20 +178,14 @@ final class HttpRequest implements Runnable {
             boolean obeyFileRequest = true;
             switch (headerLineList.get(0)[0]) {
                 case "GET":
-                    System.out.println("Method used: GET");
                     fileRequested = true;
                     break;
                 case "HEAD":
-                    System.out.println("Method used: HEAD");
                     fileRequested = true;
                     obeyFileRequest = false;
                     break;
                 case "POST":
-                    System.out.println("Method used: POST");
-                    notImplemented();
-                    break;
                 default:
-                    System.out.println("Method used: NULL");
                     notImplemented();
             }
             if (fileRequested) {
@@ -199,7 +201,7 @@ final class HttpRequest implements Runnable {
                     try {
                         if (obeyFileRequest) sendBytes(fis, os);
                     } catch (Exception e) {
-                        System.out.println("Data transmission aborted. Connection closed by client.\n");
+                        System.out.println("Data transmission aborted." + closedByClient);
                     }
                     try { fis.close(); } catch (IOException e) { }
                 } catch (FileNotFoundException e) {
@@ -215,10 +217,10 @@ final class HttpRequest implements Runnable {
         try {
             if (socket != null) {
                 socket.close();
-                System.out.println("Connection closed by server.\n");
+                System.out.println(closedByServer);
             }
-            else System.out.println("Connection closed by client.\n");
-        } catch (IOException e) { System.out.println("Connection closed by client.\n"); }
+            else System.out.println(closedByClient);
+        } catch (IOException e) { System.out.println(closedByClient); }
     }
 
     private void sendResponse() {
@@ -237,7 +239,7 @@ final class HttpRequest implements Runnable {
                 // Send predefined entity-body if no ressource is to be send
                 if (!fileExists) os.writeBytes(entityBody);
             }
-            else System.out.println("Connection closed by client.\n");
+            else System.out.println(closedByClient);
         } catch (IOException e) {
             System.out.println("Server error: could not send response.");
         }
@@ -309,10 +311,3 @@ final class HttpRequest implements Runnable {
     }
 }
 
-// TODO:
-// Testen unter Linux
-// Testen mit verschiedenen Browsern und Telnet
-// Request Headerlines mit mehreren Whitespace-Zeichen testen
-// URL Decoding
-// POST implementieren (s.u.a. 7.2.2 - content-length), Response 201, content-length s. 10.4
-// Conditional GET s. 8.1 und 10.9
