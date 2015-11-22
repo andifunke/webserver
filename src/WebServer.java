@@ -151,6 +151,7 @@ final class HttpRequest implements Runnable {
                     userAgent = headerLine.replaceFirst("User-Agent: ", "");
                 // Create tokens from header-line
                 headerLineList.add(headerLine.split("\\s"));
+                System.out.println(headerLine.length());
             }
         } catch (SocketException e) {
             System.out.println("Connection closed by client.\n");
@@ -195,7 +196,11 @@ final class HttpRequest implements Runnable {
                     fis = new FileInputStream(fileName);
                     fileExists = true;
                     ok(fileName);
-                    try { if (obeyFileRequest) sendBytes(fis, os); } catch (IOException e) { }
+                    try {
+                        if (obeyFileRequest) sendBytes(fis, os);
+                    } catch (Exception e) {
+                        System.out.println("Data transmission aborted. Connection closed by client.\n");
+                    }
                     try { fis.close(); } catch (IOException e) { }
                 } catch (FileNotFoundException e) {
                     notFound();
